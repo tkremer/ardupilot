@@ -16,8 +16,9 @@
 // tandem modes
 #define AP_MOTORS_HELI_DUAL_MODE_TANDEM                0 // tandem mode (rotors front and aft)
 #define AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE            1 // transverse mode (rotors side by side)
+#define AP_MOTORS_HELI_DUAL_MODE_COAXIAL               2 // coaxial mode (rotors top and bottom)
 
-// tandem modes
+// swashplate axes
 #define AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH           0 // swashplate pitch tilt axis
 #define AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL            1 // swashplate roll tilt axis
 #define AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL            2 // swashplate collective axis
@@ -33,13 +34,17 @@
 #define AP_MOTORS_HELI_DUAL_COLLECTIVE2_MAX 1750
 #define AP_MOTORS_HELI_DUAL_COLLECTIVE2_MID 1500
 
+// separate rsc output channel for second rotor
+#define AP_MOTORS_HELI_DUAL_TAILRSC                          CH_7
+
 /// @class AP_MotorsHeli_Dual
 class AP_MotorsHeli_Dual : public AP_MotorsHeli {
 public:
     // constructor
     AP_MotorsHeli_Dual(uint16_t loop_rate,
                        uint16_t speed_hz = AP_MOTORS_HELI_SPEED_DEFAULT) :
-        AP_MotorsHeli(loop_rate, speed_hz)
+        AP_MotorsHeli(loop_rate, speed_hz),
+        _tail_rotor(SRV_Channel::k_heli_tail_rsc, AP_MOTORS_HELI_DUAL_TAILRSC)
     {
         AP_Param::setup_object_defaults(this, var_info);
     };
@@ -116,6 +121,8 @@ protected:
     //  objects we depend upon
     AP_MotorsHeli_Swash        _swashplate1;        // swashplate1
     AP_MotorsHeli_Swash        _swashplate2;        // swashplate2
+    AP_MotorsHeli_RSC          _tail_rotor;         // tail rotor
+    // TODO: how do we set the speed of the RSC? And when? _Single just doesn't.
 
     // internal variables
     float _oscillate_angle = 0.0f;                  // cyclic oscillation angle, used by servo_test function

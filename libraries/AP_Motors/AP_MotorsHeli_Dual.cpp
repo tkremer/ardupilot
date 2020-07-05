@@ -237,6 +237,7 @@ bool AP_MotorsHeli_Dual::init_outputs()
 
         // set rotor servo range
         _main_rotor.init_servo();
+        _tail_rotor.init_servo();
 
     }
 
@@ -306,6 +307,7 @@ void AP_MotorsHeli_Dual::output_test_seq(uint8_t motor_seq, int16_t pwm)
 void AP_MotorsHeli_Dual::set_desired_rotor_speed(float desired_speed)
 {
     _main_rotor.set_desired_speed(desired_speed);
+    _tail_rotor.set_desired_speed(desired_speed);
 }
 
 // set_rotor_rpm - used for governor with speed sensor
@@ -335,6 +337,7 @@ void AP_MotorsHeli_Dual::calculate_armed_scalars()
 
     // set bailout ramp time
     _main_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
+    _tail_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
 }
 
 // calculate_scalars
@@ -370,13 +373,33 @@ void AP_MotorsHeli_Dual::calculate_scalars()
 
     // set mode of main rotor controller and trigger recalculation of scalars
     _main_rotor.set_control_mode(static_cast<RotorControlMode>(_main_rotor._rsc_mode.get()));
+
+    if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_COAXIAL) {
+        //_tail_rotor.set_control_mode(ROTOR_CONTROL_MODE_SPEED_SETPOINT);
+        _tail_rotor.set_control_mode(static_cast<RotorControlMode>(_main_rotor._rsc_mode.get()));
+        // TODO: why was _rsc_setpoint not copied in _Single?
+        _tail_rotor.set_ramp_time(_main_rotor._ramp_time.get());
+        _tail_rotor.set_runup_time(_main_rotor._runup_time.get());
+        _tail_rotor.set_critical_speed(_main_rotor._critical_speed.get());
+        _tail_rotor.set_idle_output(_main_rotor._idle_output.get());
+    } else {
+        _tail_rotor.set_control_mode(ROTOR_CONTROL_MODE_DISABLED);
+        _tail_rotor.set_ramp_time(0);
+        _tail_rotor.set_runup_time(0);
+        _tail_rotor.set_critical_speed(0);
+        _tail_rotor.set_idle_output(0);
+    }
+
     calculate_armed_scalars();
 }
 
 // get_swashplate - calculate movement of each swashplate based on configuration
 float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, float pitch_input, float roll_input, float yaw_input, float coll_input)
 {
+    float forward_input = 0.0f;
+    float sideways_input = 0.0f;
     float swash_tilt = 0.0f;
+
     if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
         // roll tilt
         if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL) {
@@ -400,7 +423,7 @@ float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, f
                 swash_tilt = -0.45f * _dcp_scaler * roll_input + coll_input;
             }
         }
-    } else { // AP_MOTORS_HELI_DUAL_MODE_TANDEM
+    } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TANDEM) {
         // roll tilt
         if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL) {
             if (swash_num == 1) {
@@ -422,6 +445,25 @@ float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, f
             } else if (swash_num == 2) {
                 swash_tilt = -0.45f * _dcp_scaler * pitch_input + coll_input;
             }
+        }
+    } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_COAXIAL) {
+        // roll tilt
+        if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL) {
+            if (swash_num == 1) {
+                swash_tilt = roll_input + sideways_input;
+            } else if (swash_num == 2) {
+                swash_tilt = roll_input - sideways_input;
+            }
+        } else if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH) {
+        // pitch tilt
+            if (swash_num == 1) {
+                swash_tilt = pitch_input - forward_input;
+            } else if (swash_num == 2) {
+                swash_tilt = pitch_input + forward_input;
+            }
+        } else if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL) {
+        // collective
+            swash_tilt = coll_input;
         }
     }
     return swash_tilt;
@@ -451,6 +493,7 @@ void AP_MotorsHeli_Dual::update_motor_control(RotorControlState state)
 {
     // Send state update to motors
     _main_rotor.output(state);
+    _tail_rotor.output(state);
 
     if (state == ROTOR_CONTROL_STOP) {
         // set engine run enable aux output to not run position to kill engine when disarmed
@@ -460,8 +503,8 @@ void AP_MotorsHeli_Dual::update_motor_control(RotorControlState state)
         SRV_Channels::set_output_limit(SRV_Channel::k_engine_run_enable, SRV_Channel::SRV_CHANNEL_LIMIT_MAX);
     }
 
-    // Check if rotors are run-up
-    _heliflags.rotor_runup_complete = _main_rotor.is_runup_complete();
+    // Check if both rotors are run-up, tail rotor controller always returns true if not enabled
+    _heliflags.rotor_runup_complete = ( _main_rotor.is_runup_complete() && _tail_rotor.is_runup_complete() );
 }
 
 //
@@ -491,7 +534,7 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
             pitch_out = _cyclic_max/4500.0f;
             limit.pitch = true;
         }
-    } else {
+    } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TANDEM) {
         if (roll_out < -_cyclic_max/4500.0f) {
             roll_out = -_cyclic_max/4500.0f;
             limit.roll = true;
@@ -501,6 +544,17 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
             roll_out = _cyclic_max/4500.0f;
             limit.roll = true;
         }
+    } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_COAXIAL) {
+      // Taken from _Single
+      float total_out = norm(pitch_out, roll_out);
+
+      if (total_out > (_cyclic_max/4500.0f)) {
+          float ratio = (float)(_cyclic_max/4500.0f) / total_out;
+          roll_out *= ratio;
+          pitch_out *= ratio;
+          limit.roll = true;
+          limit.pitch = true;
+      }
     }
 
     if (_heliflags.inverted_flight) {
@@ -508,14 +562,18 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
     }
 
     float yaw_compensation = 0.0f;
+    float yaw_for_rotor = 0.0f;
 
     // if servo output not in manual mode, process pre-compensation factors
     if (_servo_mode == SERVO_CONTROL_MODE_AUTOMATED) {
         // add differential collective pitch yaw compensation
         if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
             yaw_compensation = _dcp_yaw_effect * roll_out;
-        } else { // AP_MOTORS_HELI_DUAL_MODE_TANDEM
+        } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TANDEM) {
             yaw_compensation = _dcp_yaw_effect * pitch_out;
+        } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_COAXIAL) {
+            yaw_compensation = 0.0f;
+            yaw_for_rotor = _yaw_scaler * yaw_out;
         }
         yaw_out = yaw_out + yaw_compensation;
     }
@@ -563,7 +621,9 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
 
     // feed power estimate into main rotor controller
     // ToDo: add main rotor cyclic power?
-    _main_rotor.set_collective(fabsf(collective_out));
+    // This is kind of a hack, as we influence the rotor via its collective input when we really just want to introduce an offset for yaw control.
+    _main_rotor.set_collective(fabsf(collective_out)+yaw_for_rotor);
+    _tail_rotor.set_collective(fabsf(collective2_out)-yaw_for_rotor);
 
     // compute swashplate tilt
     float swash1_pitch = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH, pitch_out, roll_out, yaw_out, collective_out_scaled);
