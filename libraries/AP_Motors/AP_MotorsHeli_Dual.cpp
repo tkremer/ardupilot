@@ -394,10 +394,8 @@ void AP_MotorsHeli_Dual::calculate_scalars()
 }
 
 // get_swashplate - calculate movement of each swashplate based on configuration
-float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, float pitch_input, float roll_input, float yaw_input, float coll_input)
+float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, float pitch_input, float roll_input, float yaw_input, float coll_input, float forward_input, float lateral_input)
 {
-    float forward_input = 0.0f;
-    float sideways_input = 0.0f;
     float swash_tilt = 0.0f;
 
     if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
@@ -450,9 +448,9 @@ float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, f
         // roll tilt
         if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL) {
             if (swash_num == 1) {
-                swash_tilt = roll_input + sideways_input;
+                swash_tilt = roll_input + lateral_input;
             } else if (swash_num == 2) {
-                swash_tilt = roll_input - sideways_input;
+                swash_tilt = roll_input - lateral_input;
             }
         } else if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH) {
         // pitch tilt
@@ -517,6 +515,10 @@ void AP_MotorsHeli_Dual::update_motor_control(RotorControlState state)
 //
 void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float collective_in, float yaw_out)
 {
+    // Those should also be parameters, but that would change the interface:
+    float fwd_in = get_forward();
+    float lat_in = get_lateral();
+
     // initialize limits flag
     limit.roll = false;
     limit.pitch = false;
@@ -626,12 +628,12 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
     _tail_rotor.set_collective(fabsf(collective2_out)-yaw_for_rotor);
 
     // compute swashplate tilt
-    float swash1_pitch = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH, pitch_out, roll_out, yaw_out, collective_out_scaled);
-    float swash1_roll = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL, pitch_out, roll_out, yaw_out, collective_out_scaled);
-    float swash1_coll = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL, pitch_out, roll_out, yaw_out, collective_out_scaled);
-    float swash2_pitch = get_swashplate(2, AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH, pitch_out, roll_out, yaw_out, collective2_out_scaled);
-    float swash2_roll = get_swashplate(2, AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL, pitch_out, roll_out, yaw_out, collective2_out_scaled);
-    float swash2_coll = get_swashplate(2, AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL, pitch_out, roll_out, yaw_out, collective2_out_scaled);
+    float swash1_pitch = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH, pitch_out, roll_out, yaw_out, collective_out_scaled, fwd_in, lat_in);
+    float swash1_roll = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL, pitch_out, roll_out, yaw_out, collective_out_scaled, fwd_in, lat_in);
+    float swash1_coll = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL, pitch_out, roll_out, yaw_out, collective_out_scaled, fwd_in, lat_in);
+    float swash2_pitch = get_swashplate(2, AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH, pitch_out, roll_out, yaw_out, collective2_out_scaled, fwd_in, lat_in);
+    float swash2_roll = get_swashplate(2, AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL, pitch_out, roll_out, yaw_out, collective2_out_scaled, fwd_in, lat_in);
+    float swash2_coll = get_swashplate(2, AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL, pitch_out, roll_out, yaw_out, collective2_out_scaled, fwd_in, lat_in);
  
     // get servo positions from swashplate library
     _servo_out[CH_1] = _swashplate1.get_servo_out(CH_1,swash1_pitch,swash1_roll,swash1_coll);

@@ -113,7 +113,7 @@ protected:
     void update_motor_control(RotorControlState state) override;
 
     // get_swashplate - calculate movement of each swashplate based on configuration
-    float get_swashplate(int8_t swash_num, int8_t swash_axis, float pitch_input, float roll_input, float yaw_input, float coll_input);
+    float get_swashplate(int8_t swash_num, int8_t swash_axis, float pitch_input, float roll_input, float yaw_input, float coll_input, float forward_input, float lateral_input);
 
     // move_actuators - moves swash plate to attitude of parameters passed in
     void move_actuators(float roll_out, float pitch_out, float coll_in, float yaw_out)  override;
