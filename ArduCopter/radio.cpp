@@ -26,8 +26,9 @@ void Copter::init_rc_in()
     channel_pitch    = rc().channel(rcmap.pitch()-1);
     channel_throttle = rc().channel(rcmap.throttle()-1);
     channel_yaw      = rc().channel(rcmap.yaw()-1);
-    channel_forward  = rc().channel(rcmap.forward()-1);
-    channel_lateral  = rc().channel(rcmap.lateral()-1);
+    // GUIs don't allow changing rcmap.forward() and rcmap.lateral() :-(
+    channel_forward  = rc().channel(CH_12);
+    channel_lateral  = rc().channel(CH_13);
 
     // set rc channel ranges
     channel_roll->set_angle(ROLL_PITCH_YAW_INPUT_MAX);
