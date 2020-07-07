@@ -119,6 +119,9 @@ void ModeAcro_Heli::run()
 
     // output pilot's throttle without angle boost
     attitude_control->set_throttle_out(pilot_throttle_scaled, false, g.throttle_filt);
+
+    motors->set_forward(channel_forward->norm_input());
+    motors->set_lateral(channel_lateral->norm_input());
 }
 
 

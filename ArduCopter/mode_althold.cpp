@@ -103,4 +103,6 @@ void ModeAltHold::run()
     // call z-axis position controller
     pos_control->update_z_controller();
 
+    motors->set_forward(channel_forward->norm_input());
+    motors->set_lateral(channel_lateral->norm_input());
 }

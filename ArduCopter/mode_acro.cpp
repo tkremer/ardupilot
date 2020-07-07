@@ -57,6 +57,9 @@ void ModeAcro::run()
     attitude_control->set_throttle_out(get_pilot_desired_throttle(),
                                        false,
                                        copter.g.throttle_filt);
+
+    motors->set_forward(channel_forward->norm_input());
+    motors->set_lateral(channel_lateral->norm_input());
 }
 
 float ModeAcro::throttle_hover() const
