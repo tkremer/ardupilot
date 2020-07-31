@@ -143,6 +143,7 @@ protected:
 
     // internal variables
     float           _collective2_mid_pct = 0.0f;      // collective mid parameter value for rear swashplate converted to 0 ~ 1 range
+    float           _desired_rotor_speed = 0.0f;    // last requested rotor speed (we don't pass it through immediately)
 };
 
 #endif  // AP_MotorsHeli_Dual

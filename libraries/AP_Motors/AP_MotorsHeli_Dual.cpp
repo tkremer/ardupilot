@@ -306,8 +306,11 @@ void AP_MotorsHeli_Dual::output_test_seq(uint8_t motor_seq, int16_t pwm)
 // set_desired_rotor_speed
 void AP_MotorsHeli_Dual::set_desired_rotor_speed(float desired_speed)
 {
+    _desired_rotor_speed = desired_speed;
+    /*
     _main_rotor.set_desired_speed(desired_speed);
     _tail_rotor.set_desired_speed(desired_speed);
+    */
 }
 
 // set_rotor_rpm - used for governor with speed sensor
@@ -461,7 +464,10 @@ float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, f
             }
         } else if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL) {
         // collective
-            swash_tilt = coll_input;
+            // we need to have some resistance to push against for yaw.
+            // if yaw pushes the same way as coll, that is the rotor where we want it summed up rather than cancelled out.
+            int8_t favorable_rotor = yaw_input*coll_input >= 0 ? 1 : 2;
+            swash_tilt = coll_input+yaw_input*((swash_num == favorable_rotor) ? 1 : -1);
         }
     }
     return swash_tilt;
@@ -626,6 +632,14 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
     // This is kind of a hack, as we influence the rotor via its collective input when we really just want to introduce an offset for yaw control.
     _main_rotor.set_collective(fabsf(collective_out)+yaw_for_rotor);
     _tail_rotor.set_collective(fabsf(collective2_out)-yaw_for_rotor);
+
+    // TODO: need to get some units and adjustables here
+    float r1_speed =
+        constrain_float(_desired_rotor_speed+yaw_for_rotor,0.0f,1.0f);
+    float r2_speed =
+        constrain_float(_desired_rotor_speed-yaw_for_rotor,0.0f,1.0f);
+    _main_rotor.set_desired_speed(r1_speed);
+    _tail_rotor.set_desired_speed(r2_speed);
 
     // compute swashplate tilt
     float swash1_pitch = get_swashplate(1, AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH, pitch_out, roll_out, yaw_out, collective_out_scaled, fwd_in, lat_in);
