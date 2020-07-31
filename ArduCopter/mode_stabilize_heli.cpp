@@ -77,9 +77,13 @@ void ModeStabilize_Heli::run()
     // output pilot's throttle - note that TradHeli does not used angle-boost
     attitude_control->set_throttle_out(pilot_throttle_scaled, false, g.throttle_filt);
 
+    /*
     float current_yaw = ahrs.get_yaw();
     float c = cosf(current_yaw);
     float s = sinf(current_yaw);
+    */
+    float c = ahrs.cos_yaw();
+    float s = ahrs.sin_yaw();
     float y = channel_forward->norm_input();
     float x = channel_lateral->norm_input();
     motors->set_forward(c*y+s*x);
