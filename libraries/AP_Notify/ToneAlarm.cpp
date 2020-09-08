@@ -432,6 +432,6 @@ void AP_ToneAlarm::handle_play_tune(const mavlink_message_t &msg)
     uint8_t len2 = strnlen(packet.tune2, sizeof(packet.tune2));
     len2 = MIN((sizeof(_tone_buf)-1)-len, len2);
     strncpy(_tone_buf+len, packet.tune2, len2);
-    _tone_buf[sizeof(_tone_buf)-1] = 0;
+    _tone_buf[len+len2] = 0;
     _mml_player.play(_tone_buf);
 }
